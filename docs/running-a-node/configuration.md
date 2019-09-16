@@ -30,6 +30,7 @@ This is the main configuration file for controlling node behavior. Below is an e
             "ledger": "false", // Track incoming blocks
             "ledger_duplicate": "false",
             "network": "true", // Track general network info like forks
+            "network_timeout": "false", // Track TCP socket disconnections due to timeout
             "network_message": "false",
             "network_publish": "false", // Track blocks you publish to
             "network_packet": "false", // Track packets origin
@@ -47,7 +48,9 @@ This is the main configuration file for controlling node behavior. Below is an e
             "flush": "true",  // Setting this to false gives better performance, but may lose entries on crashes.
             "upnp_details": "false", // Determines if upnp discovery details are logged (default off to avoid sharing device info when shipping logs)
             "timing": "false", // Logs durations of key functions, such as batch verification, etc.
-            "log_ipc": "true" // Logging of IPC related messages
+            "log_ipc": "true", // Logging of IPC related messages
+            "min_time_between_output": "5", // Minimum time between log calls, in ms
+            "single_line_record": "false" // Log each record in single line (including block content & election results with votes)
         },
         "vote_minimum": "1000000000000000000000000000000000",// Prevents voting if delegated weight is under this threshold
         "work_peers": "", // Delegate a node your hash work, you need to get RPC access to that node
@@ -56,14 +59,14 @@ This is the main configuration file for controlling node behavior. Below is an e
             "::ffff:138.201.94.249"
         ],
         "preconfigured_representatives": [ // List of defaults representatives, which you delegate voting weight, of your wallet
-            "xrb_3arg3asgtigae3xckabaaewkx3bzsh7nwz7jkmjos79ihyaxwphhm6qgjps4",
-            "xrb_1stofnrxuz3cai7ze75o174bpm7scwj9jn3nxsn8ntzg784jf1gzn1jjdkou",
-            "xrb_1q3hqecaw15cjt7thbtxu3pbzr1eihtzzpzxguoc37bj1wc5ffoh7w74gi6p",
-            "xrb_3dmtrrws3pocycmbqwawk6xs7446qxa36fcncush4s1pejk16ksbmakis78m",
-            "xrb_3hd4ezdgsp15iemx7h81in7xz5tpxi43b6b41zn3qmwiuypankocw3awes5k",
-            "xrb_1awsn43we17c1oshdru4azeqjz9wii41dy8npubm4rg11so7dx3jtqgoeahy",
-            "xrb_1anrzcuwe64rwxzcco8dkhpyxpi8kd7zsjc1oeimpc3ppca4mrjtwnqposrs",
-            "xrb_1hza3f7wiiqa7ig3jczyxj5yo86yegcmqk3criaz838j91sxcckpfhbhhra1"
+            "nano_3arg3asgtigae3xckabaaewkx3bzsh7nwz7jkmjos79ihyaxwphhm6qgjps4",
+            "nano_1stofnrxuz3cai7ze75o174bpm7scwj9jn3nxsn8ntzg784jf1gzn1jjdkou",
+            "nano_1q3hqecaw15cjt7thbtxu3pbzr1eihtzzpzxguoc37bj1wc5ffoh7w74gi6p",
+            "nano_3dmtrrws3pocycmbqwawk6xs7446qxa36fcncush4s1pejk16ksbmakis78m",
+            "nano_3hd4ezdgsp15iemx7h81in7xz5tpxi43b6b41zn3qmwiuypankocw3awes5k",
+            "nano_1awsn43we17c1oshdru4azeqjz9wii41dy8npubm4rg11so7dx3jtqgoeahy",
+            "nano_1anrzcuwe64rwxzcco8dkhpyxpi8kd7zsjc1oeimpc3ppca4mrjtwnqposrs",
+            "nano_1hza3f7wiiqa7ig3jczyxj5yo86yegcmqk3criaz838j91sxcckpfhbhhra1"
         ],
         "online_weight_minimum": "60000000000000000000000000000000000000", // Online weight minimum required to confirm block
         "online_weight_quorum": "50", // Percentage of votes required to rollback blocks
@@ -81,13 +84,13 @@ This is the main configuration file for controlling node behavior. Below is an e
         "signature_checker_threads": "1", // Number of threads to use for verifying signatures
         "unchecked_cutoff_time": "14400", // Number of seconds unchecked entry survives before being cleaned
         "tcp_io_timeout": "15", // Timeout in seconds for TCP connect-, read- and write operations
-        "tcp_idle_timeout": "120", // Default idle disconnection timeout in seconds
         "pow_sleep_interval": "0", // The amount to sleep after each batch of POW calculations. Reduces max CPU usage at the expensive of a longer workgeneration time.
         "external_address": "::",
         "external_port": "0",
+        "tcp_incoming_connections_max": "1024", // Allowed incoming TCP connections count
         "websocket": {
             "enable": "false",
-            "address": "::1", // Docker has inconsistent support for ipv6 so default Docker setup will have ::ffff:127.0.0.1 and it should be kept this value
+            "address": "::1", // Default IPv6 address to listen on. If using Docker, change address to ::ffff:0.0.0.0 to listen on all interfaces within the container.
             "port": "7078"
         },
         "ipc": { // For more details about these options see the IPC section below
@@ -112,11 +115,15 @@ This is the main configuration file for controlling node behavior. Below is an e
                     "ignore_writes_below_block_processor_max_time": "true" // Ignore any block processor writes less than block_processor_max_time
                 }
         },
-	"use_memory_pools": "true", // Improve performance by using memory pools (Note: Memory allocated will be reused but never reclaimed, if having memory issues then try turning this off)
-	"confirmation_history_size": "2048", // Controls confirmation history size, default setting preserves existing behavior
-    "bandwidth_limit": "5242880", // Outbound voting traffic limit in bytes/sec after which messages will be dropped
-    "vote_generator_delay": "50", // Delay in ms before votes are sent out to allow for better bundling of hashes in votes - better performing nodes may need slightly higher values to optimize vote bandwidth
-    "active_elections_size": "50000" // Limits number of active elections in container before dropping will be considered (other conditions must also be satisfied), minimum value allowed is 250.
+        "use_memory_pools": "true", // Improve performance by using memory pools (Note: Memory allocated will be reused but never reclaimed, if having memory issues then try turning this off)
+        "confirmation_history_size": "2048", // Controls confirmation history size, default setting preserves existing behavior
+        "bandwidth_limit": "5242880", // Outbound voting traffic limit in bytes/sec after which messages will be dropped
+        "vote_generator_delay": "100", // Delay in ms before votes are sent out to allow for better bundling of hashes in votes
+        "vote_generator_threshold": "3", // Defines the point at which the node will delay sending votes for another vote_generator_delay. Allows for more hashes to be bundled under load
+        "active_elections_size": "50000", // Limits number of active elections in container before dropping will be considered (other conditions must also be satisfied), minimum value allowed is 250.
+        "conf_height_processor_batch_min_time": "50", // Amount of time in ms to batch setting confirmation heights for accounts during high tps to reduce write I/O bottlenecks.
+        "backup_before_upgrade": "false", // Backup ledger & wallet databases before each upgrade
+        "work_watcher_period": "5" // Time between checks for confirmation and re-generating higher difficulty work if unconfirmed, for blocks in the work watcher
     },
     "rpc_enable": "true", // Enable (in-process or child process) or disable RPC. Out of process rpc servers can still be used if launched manually.
     "rpc": {
@@ -125,7 +132,7 @@ This is the main configuration file for controlling node behavior. Below is an e
         "version": "1",
         "child_process": {
             "enable": "false", // Whether the rpc server is run as a child process rather than in-process
-            "rpc_path": "C:\\Users\\Wesley\\Documents\\raiblocks\\build\\Debug\\nano_rpc.exe", // The nano_rpc executable to run if enabled.
+            "rpc_path": "C:\\Users\\Wesley\\Documents\\raiblocks\\build\\Debug\\nano_rpc.exe", // The nano_rpc executable to run if enabled (Windows example).
         }
     },
     "opencl_enable": "false", // Enable GPU hashing
@@ -182,12 +189,12 @@ On startup, the node will generate configuration options for IPC, one entry for 
    "tcp": {
        "enable": "false",
        "port": "7077",
-       "io_timeout": "15000"
+       "io_timeout": "15" // seconds
    },
    "local": {
        "enable": "false",
        "path": "\/tmp\/nano",
-       "io_timeout": "15000"
+       "io_timeout": "15" // seconds
      }
 },
 ```

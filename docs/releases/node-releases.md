@@ -7,6 +7,8 @@ The following release is the latest and only release actively supported by the N
 |              |                  |              |               | 					|
 | 19.0         | 17               | 2019-07-11   | [V19.0](/releases/node-releases/#v190) | [Release](https://github.com/nanocurrency/nano-node/releases/tag/V19.0) - [Milestone](https://github.com/nanocurrency/nano-node/milestone/9) - [Changelog](https://github.com/nanocurrency/nano-node/compare/V18.0...V19.0) | 
 
+--8<-- "known-issues-v19.md"
+
 ---
 
 ## Next Planned Release
@@ -65,7 +67,7 @@ Upgrades from versions V17.1 and to V19 will involve a sequential database upgra
 	It is highly recommended that nodes are upgraded to V18.0 first or a V18.0 ledger is acquired and used when upgrading to V19.0.
 
 **Confirmation tracking considerations**  
-The addition of confirmation height to the database requires the node to validate that blocks are confirmed before the cementing can occur. This process can take up to 24 hours or longer to complete but won’t impact participation on the network. For integrations watching confirmations, the existing [HTTP callback](/integration-guides/advanced/#http-callback), [block_confirm](/commands/rpc-protocol/#block_confirm) RPC and [confirmation_history](/commands/rpc-protocol/#confirmation_history) RPC methods will continue to function as before.
+The addition of confirmation height to the database requires the node to validate that blocks are confirmed before the cementing can occur. This process can take up to 24 hours or longer to complete and will cause an increase in some resource usage, particularly CPU and network bandwidth increases, but won’t impact participation on the network. For integrations watching confirmations, the existing [HTTP callback](/integration-guides/advanced/#http-callback), [block_confirm](/commands/rpc-protocol/#block_confirm) RPC and [confirmation_history](/commands/rpc-protocol/#confirmation_history) RPC methods will continue to function as before.
 
 !!! warning "Tracking confirmed block hashes required"
 	It is required that tracking of confirmed block hashes outside the node is done to avoid potential duplicate notifications from causing issues. This was a requirement in previous versions and remains the same with V19.
@@ -102,11 +104,14 @@ Blocks being published and voted on live are now supported via TCP, with UDP rem
 With the ability to track work difficulty seen on the network and have the node wallet produce more difficult work for local blocks, this feature allows users to get their transactions prioritized for processing. More details about this feature can be found in the Medium article: https://medium.com/nanocurrency/dynamic-proof-of-work-prioritization-4618b78c5be9
 
 **RPC Process Options**  
-By default the RPC server will run in the node process, but can be configured to run as a child process or completely out of process (including on a different computer), depending on your needs. See [Running Nano as a service](/integration-guides/advanced/#running-nano-as-a-service) for more details.
+By default the RPC server will run in the node process, but can be configured to run as a child process or completely out of process (currently limited to running on the same computer), depending on your needs. See [Running Nano as a service](/integration-guides/advanced/#running-nano-as-a-service) for more details.
 
 ---
 
 #### RPC/CLI Updates
+
+!!! success "No Breaking Changes"
+	There were no breaking changes made in V19 for any RPC or CLI commands. It is recommended any integrations run tests against V19 before upgrading production nodes, and also explore the various changes below to improve their setups.
 
 * **NEW** [`unopened`](/commands/rpc-protocol/#unopened) RPC provides the total pending balance for unopened accounts
 * **NEW** [`active_difficulty`](/commands/rpc-protocol/#active_difficulty) RPC allows tracking of the difficulty levels seen on the network which can be used to target higher levels of PoW to prioritize transactions

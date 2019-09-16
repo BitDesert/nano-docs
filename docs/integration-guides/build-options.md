@@ -5,6 +5,8 @@
 **OS Binaries**  
 Each release cycle official builds of the node for Linux, MacOS and Windows are generated and linked to from the related [GitHub Release](https://github.com/nanocurrency/nano-node/releases) as well as on [Nano.org](https://nano.org/en).
 
+--8<-- "known-issues-v19.md"
+
 **Other sources**  
 The node can be also be installed from other sources including [Docker](/running-a-node/node-setup#installing-docker) and RHEL/CentOS rpm:
 ```
@@ -112,6 +114,8 @@ Format: `cmake -D VARNAME=VARVALUE`
 * `CRYPTOPP_CUSTOM=ON` (more conservative building of Crypto++ for wider range of systems)
 * `NANO_SIMD_OPTIMIZATIONS=OFF` (Enable CPU-specific SIMD optimization: SSE/AVX or NEON, e.g.)
 * `NANO_SECURE_RPC=ON` (to build node with TLS)
+* `NANO_WARN_TO_ERR=ON` (*v20.0+* turn compiler warnings into errors on Linux/Mac) 
+* `NANO_TIMED_LOCKS=50` (*v20.0+* when the number of milliseconds a mutex is held is equal or greater than this output a stacktrace, 0 disables. If enabled requires the boost `context` & `fiber` libraries)
 
 **Build Node**
 
@@ -119,6 +123,7 @@ Format: `cmake -D VARNAME=VARVALUE`
 * Generate with cmake then build with your compiler
 * (\*nix) to build node without GUI execute: `make nano_node`
 * (\*nix) to build wallet with GUI execute: `make nano_wallet`
+* (\*nix) to build rpc for child/out of process execute: `make nano_rpc`
 
 **Building a package**
 
@@ -279,3 +284,73 @@ make
 ./nano_node/nano_node --daemon
 ```
 
+## Build Instructions - Windows
+
+### Dependencies
+
+* [Boost 1.67+ for your build env](https://sourceforge.net/projects/boost/files/boost-binaries)
+* [Qt 5.9.5+ 64-bit (open source version) appropriate for your build env](https://www.qt.io/download) 
+* [Git for Windows](https://git-scm.com/download/win) **git_bash**
+* [CMake](https://cmake.org/download/)
+* [Visual Studio 2017 Community](https://my.visualstudio.com/Downloads?q=visual%20studio%202017&wt.mc_id=o~msft~vscom~older-downloads) (or higher edition, if you have a valid license. eg. Professional or Enterprise) 
+	* Select **Desktop development with C++**
+	* Select the latest Windows 10 SDK
+	
+### Setup
+
+**Download Source**
+
+Using git_bash:
+```bash
+git clone --recursive https://github.com/nanocurrency/nano-node
+cd nano-node 
+```
+
+**Create a `build` folder inside nano-node (makes for easier cleaning of build)**
+
+Using git_bash:
+```bash
+mkdir build 
+cd build 
+``` 
+* **Note:** all subsequent commands should be run within this "build" folder.
+
+**Get redistributables** 
+
+Using Powershell:
+```bash
+Invoke-WebRequest -Uri https://aka.ms/vs/15/release/vc_redist.x64.exe -OutFile .\vc_redist.x64.exe 
+```
+
+**Generate the build configuration.**
+
+Using 64 Native Tools Command Prompt:
+
+* Replace **%CONFIGURATION%** with one of the following: `Release`, `RelWithDebInfo`, `Debug`
+* Replace **%NETWORK%** with one of the following: `nano_beta_network`, `nano_live_network`, `nano_test_network`
+* Ensure the Qt, Boost, and Windows SDK paths match your installation.
+
+```bash
+cmake -DNANO_GUI=ON -DCMAKE_BUILD_TYPE=%CONFIGURATION% -DACTIVE_NETWORK=%NETWORK% -DQt5_DIR="C:\Qt\5.9.5\msvc2017_64\lib\cmake\Qt5" -DNANO_SIMD_OPTIMIZATIONS=TRUE -DBoost_COMPILER="-vc141" -DBOOST_ROOT="C:/local/boost_1_67_0" -DBOOST_LIBRARYDIR="C:/local/boost_1_67_0/lib64-msvc-14.1" -G "Visual Studio 15 2017 Win64" -DIPHLPAPI_LIBRARY="C:/Program Files (x86)/Windows Kits/10/Lib/10.0.17763.0/um/x64/iphlpapi.lib" -DWINSOCK2_LIBRARY="C:/Program Files (x86)/Windows Kits/10/Lib/10.0.17763.0/um/x64/WS2_32.lib" ..\. 
+```
+
+### Build
+	
+* Open `nano-node.sln` in Visual Studio
+* Build the configuration specified in the previous step
+* Alternative using 64 Native Tools Command Prompt:
+
+```bash 
+cmake --build . --target ALL_BUILD --config %CONFIGURATION% -- /m:%NUMBER_OF_PROCESSORS% 
+```
+
+### Package up binaries
+
+Using 64 Native Tools Command Prompt:
+
+* Replace **%CONFIGURATION%** with the build configuration specified in previous step
+* Replace **%GENERATOR%** with NSIS (if installed) or ZIP
+
+```bash 
+cpack -G %GENERATOR% -C %CONFIGURATION% 
+```

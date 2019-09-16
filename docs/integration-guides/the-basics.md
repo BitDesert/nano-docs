@@ -49,21 +49,69 @@ In general, PoW is the solving of a simple math problem where a solution can onl
 The `"work"` field in transactions contains a 64-bit [nonce](https://en.wikipedia.org/wiki/Cryptographic_nonce) found using the blake2b hash function.  The nonce satisfies the equation.
 
 $$
-blake2b(nonce || prev\_block\_hash) >= threshold
+blake2b(\text{nonce} || \text{prev_block_hash}) \ge \text{threshold}
 $$
 
-Currently the mainnet's threshold is `0xffffffc000000000`. When running a node the work is automatically calculated for you, but options exist for delegating work generation to [work peers](/running-a-node/configuration/#work_peers) and allowing GPU acceleration by [enabling OpenCL](/running-a-node/configuration/#opencl_enable).
+Currently the mainnet's base threshold is `0xffffffc000000000`. When running a node the work is automatically calculated for you, but options exist for delegating work generation to [work peers](/running-a-node/configuration/#work_peers) and allowing GPU acceleration by [enabling OpenCL](/running-a-node/configuration/#opencl_enable). With the addition of Dynamic PoW and rework in V19.0, the threshold used to calculate work can vary under certain conditions.
 
 !!! info
-    Any random nonce has a $1.49 * 10^{-8}$ chance of being a correct solution. This results in an average of $67,108,864$ guesses to generate a valid nonce that requires only a single blake2b hash to validate.
+    At the base threshold, any random nonce has a $1.49 * 10^{-8}$ chance of being a correct solution. This results in an average of $67,108,864$ guesses to generate a valid nonce that requires only a single blake2b hash to validate.
 
 #### First Account Block
 
 The first block on an account-chain doesn't have a previous (head) block, so a variant of the above equation is used to calculate the `"work"` field:
 
 $$
-blake2b(nonce || public\_key) >= threshold
+blake2b(\text{nonce} || \text{public_key}) \ge \text{threshold}
 $$
+
+### Difficulty Multiplier
+
+Relative difficulty, or difficulty multiplier, describes how much more value a PoW has compared to another. In the node this is typically used to compare against the base threshold, often in relation to rework being performed or validated for the Dynamic PoW feature introduced in V19.0.
+
+A multiplier can be obtained with the following expression.
+
+$$
+\frac{(2^{64} - \text{base_difficulty})}{(2^{64} - \text{work_difficulty})}
+$$
+
+In the inverse direction, in order to get the equivalent difficulty for a certain multiplier, the following expression can be used.
+
+$$
+2^{64} - \frac{2^{64} - \text{base_difficulty}}{\text{multiplier}}
+$$
+
+??? example "Code Snippets"
+    **Python**
+    ```python
+    def to_multiplier(difficulty: int, base_difficulty) -> float:
+      return float((1 << 64) - base_difficulty) / float((1 << 64) - difficulty)
+
+    def from_multiplier(multiplier: float, base_difficulty: int = NANO_DIFFICULTY) -> int:
+      return int((1 << 64) - ((1 << 64) - base_difficulty) / multiplier)
+    ```
+
+    **Rust**
+    ```rust
+    fn to_multiplier(difficulty: u64, base_difficulty: u64) -> f64 {
+      (base_difficulty.wrapping_neg() as f64) / (difficulty.wrapping_neg() as f64)
+    }
+
+    fn from_multiplier(multiplier: f64, base_difficulty: u64) -> u64 {
+      (((base_difficulty.wrapping_neg() as f64) / multiplier) as u64).wrapping_neg()
+    }
+    ```
+
+    **C++**
+    ```cpp
+    double to_multiplier(uint64_t const difficulty, uint64_t const base_difficulty) {
+      return static_cast<double>(-base_difficulty) / (-difficulty);
+    }
+
+    uint64_t from_multiplier(double const multiplier, uint64_t const base_difficulty) {
+      return (-static_cast<uint64_t>((-base_difficulty) / multiplier));
+    }
+    ```
 
 ---
 
@@ -102,6 +150,9 @@ So for address `nano_1anrzcuwe64rwxzcco8dkhpyxpi8kd7zsjc1oeimpc3ppca4mrjtwnqposr
 | Prefix  | Encoded Account Public Key                             | Checksum   |
 |         |                                                        |            |
 | `nano_` | `1anrzcuwe64rwxzcco8dkhpyxpi8kd7zsjc1oeimpc3ppca4mrjt` | `wnqposrs` |
+
+!!! question "Prefixes: nano_ vs. xrb_"
+    As of V19.0 **the Nano node only returns `nano_` addresses in all actions**, but prior versions returned `xrb_` addresses. These prefixes are interchangeable — everything after the `_` remains the same. If you have an issue using one or the other prefix with any exchange or service, you can safely switch between `nano_` and `xrb_` prefixes as needed — they both represent the same account owned by your private key or seed.
 
 ---
 
@@ -200,11 +251,12 @@ Read these examples in order to correctly interpret balances and block hashes on
 
 * Create a block to receive Nano for account: `nano_3igf8hd4sjshoibbbkeitmgkp1o6ug4xads43j6e4gqkj5xk5o83j8ja9php` account-chain.
 * Sets `nano_3p1asma84n8k84joneka776q4egm5wwru3suho9wjsfyuem8j95b3c78nw8j` as the representative.
-* This receives the block hash `B2EC73C1F503F47E051AD72ECB512C63BA8E1A0ACC2CEE4EA9A22FE1CBDB693F` and because this is the first block on the account, it is considered "opened".
+* This receives the block hash `B2EC73C1F503F47E051AD72ECB512C63BA8E1A0ACC2CEE4EA9A22FE1CBDB693F` and because this is the first block on the account, the account is considered "opened".
 
 ```bash
 curl -d '{
   "action":"block_create",
+  "json_block": "true",
   "type":"state",
   "previous":"FC5A7FB777110A858052468D448B2DF22B648943C097C0608D1E2341007438B0",
   "account":"nano_3igf8hd4sjshoibbbkeitmgkp1o6ug4xads43j6e4gqkj5xk5o83j8ja9php",
@@ -218,17 +270,17 @@ curl -d '{
 ```json
 {
   "hash": "597395E83BD04DF8EF30AF04234EAAFE0606A883CF4AEAD2DB8196AAF5C4444F",
-  "block": "{\n
-    \"type\": \"state\",\n
-    \"account\": \"nano_3igf8hd4sjshoibbbkeitmgkp1o6ug4xads43j6e4gqkj5xk5o83j8ja9php\",\n
-    \"previous\": \"FC5A7FB777110A858052468D448B2DF22B648943C097C0608D1E2341007438B0\",\n
-    \"representative\": \"nano_3p1asma84n8k84joneka776q4egm5wwru3suho9wjsfyuem8j95b3c78nw8j\",\n
-    \"balance\": \"5000000000000000000000000000001\",\n
-    \"link\": \"B2EC73C1F503F47E051AD72ECB512C63BA8E1A0ACC2CEE4EA9A22FE1CBDB693F\",\n
-    \"link_as_account\": \"nano_3eqegh1zc1znhr4joosgsfakrrxtjrf1om3exs9cmajhw97xptbzi3kfba1j\",\n
-    \"signature\": \"90CBD62F5466E35DB3BFE5EFDBC6283BD30C0591A3787C9458D11F2AF6188E45E6E71B5F4A8E3598B1C80080D6024867878E355161AD1935CD757477991D3B0B\",\n
-    \"work\": \"0000000000000000\"\n
-  }\n"
+  "block": {
+    "type": "state",
+    "account": "nano_3igf8hd4sjshoibbbkeitmgkp1o6ug4xads43j6e4gqkj5xk5o83j8ja9php",
+    "previous": "FC5A7FB777110A858052468D448B2DF22B648943C097C0608D1E2341007438B0",
+    "representative": "nano_3p1asma84n8k84joneka776q4egm5wwru3suho9wjsfyuem8j95b3c78nw8j",
+    "balance": "5000000000000000000000000000001",
+    "link": "B2EC73C1F503F47E051AD72ECB512C63BA8E1A0ACC2CEE4EA9A22FE1CBDB693F",
+    "link_as_account": "nano_3eqegh1zc1znhr4joosgsfakrrxtjrf1om3exs9cmajhw97xptbzi3kfba1j",
+    "signature": "90CBD62F5466E35DB3BFE5EFDBC6283BD30C0591A3787C9458D11F2AF6188E45E6E71B5F4A8E3598B1C80080D6024867878E355161AD1935CD757477991D3B0B",
+    "work": "0000000000000000"
+  }
 }
 ```
 
@@ -264,17 +316,17 @@ curl -d '{
 ```json
 {
   "hash": "128106287002E595F479ACD615C818117FCB3860EC112670557A2467386249D4",
-  "block": "{\n
-    \"type\": \"state\",\n
-    \"account\": \"nano_3igf8hd4sjshoibbbkeitmgkp1o6ug4xads43j6e4gqkj5xk5o83j8ja9php\",\n
-    \"previous\": \"597395E83BD04DF8EF30AF04234EAAFE0606A883CF4AEAD2DB8196AAF5C4444F\",\n
-    \"representative\": \"nano_3p1asma84n8k84joneka776q4egm5wwru3suho9wjsfyuem8j95b3c78nw8j\",\n
-    \"balance\": \"3000000000000000000000000000000\",\n
-    \"link\": \"5C2FBB148E006A8E8BA7A75DD86C9FE00C83F5FFDBFD76EAA09531071436B6AF\",\n
-    \"link_as_account\": \"nano_1q3hqecaw15cjt7thbtxu3pbzr1eihtzzpzxguoc37bj1wc5ffoh7w74gi6p\",\n
-    \"signature\": \"D7975EE2F6FAE1FC7DA336FB9DD5F7E30FC1A6825021194E614F0588073D1A4901E34E3CAE8739F1DE2FD85A73D2A0B26F8BE6539E0548C9A45E1C1887BFFC05\",\n
-    \"work\": \"0000000000000000\"\n
-  }\n"
+  "block": {
+    "type": "state",
+    "account": "nano_3igf8hd4sjshoibbbkeitmgkp1o6ug4xads43j6e4gqkj5xk5o83j8ja9php",
+    "previous": "597395E83BD04DF8EF30AF04234EAAFE0606A883CF4AEAD2DB8196AAF5C4444F",
+    "representative": "nano_3p1asma84n8k84joneka776q4egm5wwru3suho9wjsfyuem8j95b3c78nw8j",
+    "balance": "3000000000000000000000000000000",
+    "link": "5C2FBB148E006A8E8BA7A75DD86C9FE00C83F5FFDBFD76EAA09531071436B6AF",
+    "link_as_account": "nano_1q3hqecaw15cjt7thbtxu3pbzr1eihtzzpzxguoc37bj1wc5ffoh7w74gi6p",
+    "signature": "D7975EE2F6FAE1FC7DA336FB9DD5F7E30FC1A6825021194E614F0588073D1A4901E34E3CAE8739F1DE2FD85A73D2A0B26F8BE6539E0548C9A45E1C1887BFFC05",
+    "work": "0000000000000000"
+  }
 }
 ```
 
@@ -308,17 +360,17 @@ curl -d '{
 ```json
 {
   "hash": "2A322FD5ACAF50C057A8CF5200A000CF1193494C79C786B579E0B4A7D10E5A1E",
-  "block": "{\n
-    \"type\": \"state\",\n
-    \"account\": \"nano_3igf8hd4sjshoibbbkeitmgkp1o6ug4xads43j6e4gqkj5xk5o83j8ja9php\",\n
-    \"previous\": \"128106287002E595F479ACD615C818117FCB3860EC112670557A2467386249D4\",\n
-    \"representative\": \"nano_1anrzcuwe64rwxzcco8dkhpyxpi8kd7zsjc1oeimpc3ppca4mrjtwnqposrs\",\n
-    \"balance\": \"3000000000000000000000000000000\",\n
-    \"link\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n
-    \"link_as_account\": \"nano_1111111111111111111111111111111111111111111111111111hifc8npp\",\n
-    \"signature\": \"7E9A7B368DBEB280B01C22633DC82F6CEF00F529E07B76A0232614D2BCDAF85BF52AC9DA4DBE4468B6F144CE82F2FDE44080C8363F903A6EC3D999252CB1E801\",\n
-    \"work\": \"0000000000000000\"\n
-  }\n"
+  "block": {
+    "type": "state",
+    "account": "nano_3igf8hd4sjshoibbbkeitmgkp1o6ug4xads43j6e4gqkj5xk5o83j8ja9php",
+    "previous": "128106287002E595F479ACD615C818117FCB3860EC112670557A2467386249D4",
+    "representative": "nano_1anrzcuwe64rwxzcco8dkhpyxpi8kd7zsjc1oeimpc3ppca4mrjtwnqposrs",
+    "balance": "3000000000000000000000000000000",
+    "link": "0000000000000000000000000000000000000000000000000000000000000000",
+    "link_as_account": "nano_1111111111111111111111111111111111111111111111111111hifc8npp",
+    "signature": "7E9A7B368DBEB280B01C22633DC82F6CEF00F529E07B76A0232614D2BCDAF85BF52AC9DA4DBE4468B6F144CE82F2FDE44080C8363F903A6EC3D999252CB1E801",
+    "work": "0000000000000000"
+  }
 }
 ```
 
@@ -353,17 +405,17 @@ curl -d '{
 ```json
 {
   "hash": "9664412A834F0C27056C7BC4A363FBAE86DF8EF51341A5A5EA14061727AE519F",
-  "block": "{\n
-    \"type\": \"state\",\n
-    \"account\": \"nano_3igf8hd4sjshoibbbkeitmgkp1o6ug4xads43j6e4gqkj5xk5o83j8ja9php\",\n
-    \"previous\": \"2A322FD5ACAF50C057A8CF5200A000CF1193494C79C786B579E0B4A7D10E5A1E\",\n
-    \"representative\": \"nano_3p1asma84n8k84joneka776q4egm5wwru3suho9wjsfyuem8j95b3c78nw8j\",\n
-    \"balance\": \"1000000000000000000000000000000\",\n
-    \"link\": \"5C2FBB148E006A8E8BA7A75DD86C9FE00C83F5FFDBFD76EAA09531071436B6AF\",\n
-    \"link_as_account\": \"nano_1q3hqecaw15cjt7thbtxu3pbzr1eihtzzpzxguoc37bj1wc5ffoh7w74gi6p\",\n
-    \"signature\": \"4D388F982188E337D22E0E66CD24BCABD09BED1E920940C453039B55B6A4724D7BD106019AACC1840480938FF4FA024F041E6E6A32B3641C28E0262025020B03\",\n
-    \"work\": \"0000000000000000\"\n
-  }\n"
+  "block": {
+    "type": "state",
+    "account": "nano_3igf8hd4sjshoibbbkeitmgkp1o6ug4xads43j6e4gqkj5xk5o83j8ja9php",
+    "previous": "2A322FD5ACAF50C057A8CF5200A000CF1193494C79C786B579E0B4A7D10E5A1E",
+    "representative": "nano_3p1asma84n8k84joneka776q4egm5wwru3suho9wjsfyuem8j95b3c78nw8j",
+    "balance": "1000000000000000000000000000000",
+    "link": "5C2FBB148E006A8E8BA7A75DD86C9FE00C83F5FFDBFD76EAA09531071436B6AF",
+    "link_as_account": "nano_1q3hqecaw15cjt7thbtxu3pbzr1eihtzzpzxguoc37bj1wc5ffoh7w74gi6p",
+    "signature": "4D388F982188E337D22E0E66CD24BCABD09BED1E920940C453039B55B6A4724D7BD106019AACC1840480938FF4FA024F041E6E6A32B3641C28E0262025020B03",
+    "work": "0000000000000000"
+  }
 }
 ```
 
@@ -372,6 +424,8 @@ curl -d '{
 ## URI and QR Code Standards
 
 Note: `amount` values should always be in RAW.
+
+Note: Please use `nano://` for deep links 
 
 ### Send to an address
 

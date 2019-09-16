@@ -197,6 +197,8 @@ Once the block is created and signed on the `(COLD)` computer, transfer the cont
 !!! note ""
     Available in version 19.0+ only. When upgrading from version 18 or earlier, the node performs a confirmation height upgrade. During this process, the WebSocket notifications may include confirmations for old blocks. Services must handle duplicate notifications, as well as missed blocks as WebSockets do not provide guaranteed delivery. Reasons for missed blocks include intermittent network issues and internal containers (in the node or clients) reaching capacity.
 
+--8<-- "multiple-confirmation-notifications.md"
+
 The Nano node offers notification of confirmed blocks over WebSockets. This offers higher throughput over the HTTP callback, and uses a single ingoing connection instead of an outgoing connection for every block.
 
 The HTTP callback is still available and both mechanisms can be used at the same time.
@@ -267,13 +269,15 @@ If the subscription succeeds, the following message will be sent back (note that
 Current topics available for subscribing to include:
 
 * `confirmation`
-* `vote`
+* `vote` (experimental, unfinished)
 * `stopped_election`
 * `active_difficulty`
 
 ---
 
 #### Confirmations
+
+--8<-- "multiple-confirmation-notifications.md"
 
 **Subscribing**
 
@@ -286,9 +290,9 @@ To subscribe to all confirmed blocks:
 }
 ```
 
-**Filters**
+**Filtering options**
 
-###### Type filtering
+###### Confirmation types
 
 The node classifies block confirmations into the following categories:
 
@@ -312,32 +316,12 @@ The most common values for `confirmation_type` are `all` (default), `active` and
 
 If more fine-grained filtering is needed, `active` can be replaced with `active_quorum` or `active_confirmation_height` per the definitions above.
 
-###### Type field
-
-Confirmations sent through WebSockets, whether filtering is used or not, contains a `confirmation_type` field with values `active_quorum`, `active_confirmation_height` or `inactive`.
-
-
-###### Block content inclusion
-
-By setting `include_block` to `false`, the block content will not be present. Default is `true`.
-Because account filtering needs block content to function, setting this flag to false is currently incompatible with account filtering. This restriction may be lifted in future releases.
-
-```json
-{
-  "action": "subscribe",
-  "topic": "confirmation",
-  "options": {
-    "include_block": "false",
-  }
-}
-```
-
 ###### Accounts
 
 Filters for **confirmation** can be used to subscribe only to selected accounts. Once filters are given, blocks from accounts that do not match the options are not broadcasted.
 
 !!! warning "Legacy blocks never broadcasted"
-    Note that legacy blocks are never broadcasted if filters are given, even if they match the accounts.
+    Note that [legacy blocks](/glossary#legacy-blocks) are never broadcasted if filters are given, even if they match the accounts.
 
 ```json
 {
@@ -356,6 +340,47 @@ Filters for **confirmation** can be used to subscribe only to selected accounts.
 * When `all_local_accounts` is set to **`true`**, blocks that mention accounts in any wallet will be broadcasted.
 * `accounts` is a list of additional accounts to subscribe to. Both prefixes are supported.
 
+**Response options**
+
+###### Type field
+
+Confirmations sent through WebSockets, whether filtering is used or not, contains a `confirmation_type` field with values `active_quorum`, `active_confirmation_height` or `inactive`.
+
+###### Block content inclusion
+
+By setting `include_block` to `false`, the block content will not be present. Default is `true`.
+Because account filtering needs block content to function, setting this flag to false is currently incompatible with account filtering. This restriction may be lifted in future releases.
+
+```json
+{
+  "action": "subscribe",
+  "topic": "confirmation",
+  "options": {
+    "include_block": "false",
+  }
+}
+```
+
+###### Election info
+
+Details about the election leading to the confirmation can be obtained by setting the `include_election_info` option to true:
+
+```json
+{
+  "action": "subscribe",
+  "topic": "confirmation",
+  "options": {
+    "include_election_info": "true"
+  }
+}
+```
+
+Including the election info option results in the following fields being included:
+
+* election `duration` in milliseconds
+* end of election `time` as milliseconds since epoch
+* weight `tally` in raw unit
+
 **Sample Results**
 
 !!! note "Differences from the HTTP callback"
@@ -368,32 +393,39 @@ Filters for **confirmation** can be used to subscribe only to selected accounts.
 ```json
 {
   "topic": "confirmation",
-  "time": "1552766057328",
+  "time": "1564935350664",
   "message": {
-      "account": "nano_16c4ush661bbn2hxc6iqrunwoyqt95in4hmw6uw7tk37yfyi77s7dyxaw8ce",
-      "amount": "1000000000000000000000000",
-      "hash": "3E746498A3DBF5DF9CB498E00B8C9B20769112498E35EF23B3C0EF46DCF192EA",
-      "confirmation_type": "active_quorum",
-      "block": {
-          "type": "state",
-          "subtype": "send",
-          "account": "nano_16c4ush661bbn2hxc6iqrunwoyqt95in4hmw6uw7tk37yfyi77s7dyxaw8ce",
-          "previous": "21EE146C2EAD2CA30D84C43A5EEF4BCEC90F103E45905F254336E8CF591330D3",
-          "representative": "nano_3dmtrrws3pocycmbqwawk6xs7446qxa36fcncush4s1pejk16ksbmakis32c",
-          "balance": "135902000000000000000000000000",
-          "link": "1942DE5E420129A193D51217C6E9CAFAFA38E1413E7C26F85D4825F37D029725",
-          "link_as_account": "nano_16c4ush661bbn2hxc6iqrunwoyqt95in4hmw6uw7tk37yfyi77s7dyxaw8ce",
-          "signature": "CD585FC15C50BC589B9C41C5D632B26E1C66744E97DCEDA878342E10D2C219CD7BCF5F49117F29E94B6B1C8D85794DACE2CAE14D6E6C944167E7F381368CD208",
-          "work": "466ac84fc9edd4b3"
-      }
+    "account": "nano_1tgkjkq9r96zd3pkr7edj8e4qbu3wr3ps6ettzse8hmoa37nurua7faupjhc",
+    "amount": "15621963968634827029081574961",
+    "hash": "0E889F83E28152A70E87B92D846CA3D8966F3AEEC65E11B25F7B4E6760C57CA3",
+    "confirmation_type": "active_quorum",
+    "election_info": {
+      "duration": "546",
+      "time": "1564935348219",
+      "tally": "42535295865117307936387010521258262528"
+    },
+    "block": {
+      "type": "state",
+      "account": "nano_1tgkjkq9r96zd3pkr7edj8e4qbu3wr3ps6ettzse8hmoa37nurua7faupjhc",
+      "previous": "4E9003ABD469D1F58A70518234016797FA654B494A2627B8583052629A91689E",
+      "representative": "nano_3rw4un6ys57hrb39sy1qx8qy5wukst1iiponztrz9qiz6qqa55kxzx4491or",
+      "balance": "0",
+      "link": "3098F4C0D1D8BD889AF078CDFF81E982B8EFA6D6D8FAE954CF0CDC7A256C3F8B",
+      "link_as_account": "nano_1e6rym1f5p7xj4fh1y8fzy1ym1orxymffp9tx7cey58whakprhwdzuk533th",
+      "signature": "D5C332587B1A4DEA35B6F03B0A9BEB45C5BBE582060B0252C313CF411F72478721F8E7DA83A779BA5006D571266F32BDE34C1447247F417F8F12101D3ADAF705",
+      "work": "c950fc037d61e372",
+      "subtype": "send"
+    }
   }
 }
 ```
 
-
 ---
 
 #### Votes
+
+!!! warning "Experimental, unfinished"
+    This subscription is experimental and not all votes are broadcasted. The message format might change in the future.
 
 **Subscribing**
 
@@ -406,7 +438,7 @@ To subscribe to all votes notifications:
 }
 ```
 
-**Filters**
+**Filter options**
 
 Filters for **votes** can be used to subscribe only to votes from selected representatives. Once filters are given, votes from representatives that do not match the options are not broadcasted.
 
@@ -456,7 +488,7 @@ To subscribe to all stopped elections notifications:
 }
 ```
 
-**Filters**
+**Filter options**
 
 No filters are currently available for `stopped_election` topic.
 
@@ -487,7 +519,7 @@ To subscribe to all active difficulty notifications:
 }
 ```
 
-**Filters**
+**Filter options**
 
 No filters are currently available for `active_difficulty` topic.
 
@@ -509,6 +541,8 @@ No filters are currently available for `active_difficulty` topic.
 
 ### HTTP callback
 Send JSON POST requests with every confirmed block to callback server configured for the node.
+
+--8<-- "multiple-confirmation-notifications.md"
 
 **Configuration**
 
